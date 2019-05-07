@@ -52,7 +52,9 @@ func init() {
 }
 
 const (
-	watchDebounceDelay = 100 * time.Millisecond
+	watchDebounceDelay         = 100 * time.Millisecond
+	annotationMetricsInjectKey = "sidecar.istio.io/statsInclusionPrefixes"
+	annotationMetricsInjectVal = "cluster_manager,listener_manager,cluster.xds-grpc.upstream"
 )
 
 // Webhook implements a mutating webhook for automatic proxy injection.
@@ -177,6 +179,7 @@ func NewWebhook(p WebhookParameters) (*Webhook, error) {
 
 // Run implements the webhook server
 func (wh *Webhook) Run(stop <-chan struct{}) {
+
 	go func() {
 		if err := wh.server.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("admission webhook ListenAndServeTLS failed: %v", err)
@@ -531,6 +534,11 @@ func (wh *Webhook) inject(ar *v1beta1.AdmissionReview) *v1beta1.AdmissionRespons
 		return toAdmissionResponse(err)
 	}
 
+	if pod.ObjectMeta.Annotations == nil {
+		pod.ObjectMeta.Annotations = make(map[string]string)
+	}
+	pod.ObjectMeta.Annotations[annotationMetricsInjectKey] = annotationMetricsInjectVal
+
 	// Deal with potential empty fields, e.g., when the pod is created by a deployment
 	podName := potentialPodName(&pod.ObjectMeta)
 	if pod.ObjectMeta.Namespace == "" {
@@ -565,7 +573,14 @@ func (wh *Webhook) inject(ar *v1beta1.AdmissionReview) *v1beta1.AdmissionRespons
 		return toAdmissionResponse(err)
 	}
 
-	annotations := map[string]string{annotationStatus.name: status}
+	delete(pod.ObjectMeta.Annotations, annotationMetricsInjectKey)
+
+	if len(pod.ObjectMeta.Annotations) == 0 {
+		var tempMapNil map[string]string
+		pod.ObjectMeta.Annotations = tempMapNil
+	}
+
+	annotations := map[string]string{annotationStatus.name: status, annotationMetricsInjectKey: annotationMetricsInjectVal}
 
 	patchBytes, err := createPatch(&pod, injectionStatus(&pod), annotations, spec)
 	if err != nil {
