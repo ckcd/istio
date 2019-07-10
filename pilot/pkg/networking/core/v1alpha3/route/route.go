@@ -30,6 +30,7 @@ import (
 	"github.com/gogo/protobuf/types"
 
 	networking "istio.io/api/networking/v1alpha3"
+	"istio.io/istio/pilot/pkg/features"
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/networking/core/v1alpha3/route/retry"
 	"istio.io/istio/pilot/pkg/networking/util"
@@ -328,13 +329,19 @@ func translateRoute(push *model.PushContext, node *model.Proxy, in *networking.H
 	}
 
 	if redirect := in.Redirect; redirect != nil {
-		out.Action = &route.Route_Redirect{
+		action := route.Route_Redirect{
 			Redirect: &route.RedirectAction{
 				HostRedirect: redirect.Authority,
 				PathRewriteSpecifier: &route.RedirectAction_PathRedirect{
 					PathRedirect: redirect.Uri,
 				},
 			}}
+
+		if features.EnablePermanentRedirect() {
+			action.Redirect.ResponseCode = route.RedirectAction_PERMANENT_REDIRECT
+		}
+
+		out.Action = &action
 	} else {
 		action := &route.RouteAction{
 			Cors:        translateCORSPolicy(in.CorsPolicy, node),

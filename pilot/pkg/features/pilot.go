@@ -191,6 +191,12 @@ var (
 		"PILOT_SIDECAR_USE_REMOTE_ADDRESS",
 		false,
 		"UseRemoteAddress sets useRemoteAddress to true for side car outbound listeners.")
+
+	EnablePermanentRedirect = enablePermanentRedirect.Get
+	enablePermanentRedirect = env.RegisterBoolVar(
+		"PILOT_ENABLE_PERMANENT_REDIRECT",
+		false,
+		"enablePermanentRedirect enables Redirect Response Code 308.")
 )
 
 var (
